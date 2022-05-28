@@ -17,6 +17,6 @@ The Forage is the platform of Internship through Online. There are various proje
 - Deep dive into customer segments – define your recommendation from your insights, determine which segments we should be targeting, if packet sizes are relative and form an overall conclusion based on your analysis. 
 
 ## Save Clean Dataset
-    - QVI_data.csv
+ - QVI_data.csv
 
 **Result: https://htmlpreview.github.io/?https://github.com/BestChanyanart/Quantium_Forage/blob/main/Module_1.html**
