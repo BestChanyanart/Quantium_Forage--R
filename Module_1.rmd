@@ -1,0 +1,609 @@
+---
+title: "Module_1_Quantium"
+author: "Chanyanart KiattipornOpas"
+date: "10/16/2021"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## Part 1: Data Preparation and Data Cleansing
+### 1.1 Download Library 
+
+```{r Download Library, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(readxl)
+library(viridis)
+```
+
+### 1.2 Import Data into Rstudio
+
+There are 2 datasets from Quantium, which are "Customer Data" in csv.file and "Transaction Data" in excel file, so we will download these dataset into Rstudio with read_csv and read_excel 
+
+```{r Import Dataset, echo=TRUE, message=FALSE, warning=FALSE}
+
+transaction <- read_excel("QVI_transaction_data.xlsx")
+
+customer <- read_csv("QVI_purchase_behaviour.csv")
+```
+
+### 1.3 Explore Dataset 
+
+```{r Explore Dataset_Trans1}
+glimpse(transaction)
+```
+There are 8 columns with 264,836 Observations. 
+
+As I seen from data above, I found that some columns of data Type are incorrect, so I will convert data type. 
+
+```{r Explore Dataset_Trans3}
+# To convert Numeric to Factor type
+transaction$STORE_NBR <- as.factor(transaction$STORE_NBR)
+
+transaction$LYLTY_CARD_NBR <- as.factor(transaction$LYLTY_CARD_NBR)
+
+transaction$TXN_ID <- as.factor(transaction$TXN_ID)
+
+transaction$PROD_NBR <- as.factor(transaction$PROD_NBR) 
+
+glimpse(transaction)
+```
+
+```{r}
+# Count distinct values of Loyalty Card Number column. 
+length(unique(transaction$LYLTY_CARD_NBR))
+
+```
+There are 72,637 unique Loyalty Card Number. However the record of transaction table has 264,836. This mean there are Repeat customers, they back to the store and bought products more than once, or bought many products. 
+
+```{r}
+# Count distinct values of Store. 
+length(unique(transaction$STORE_NBR))
+
+# Comment: There are 272 Stores where we collected.
+```
+
+```{r Explore Dataset_Trans2}
+# To convert Numeric to Date type
+transaction$DATE <- as.Date(transaction$DATE, origin = "1899-12-30")
+
+# To check Earliest and Latest Transaction Date
+min(transaction$DATE)
+max(transaction$DATE)
+```
+
+Earliest Transaction date is "2018-07-01", and Latest Transaction date is "2019-06-30" from this dataset. 
+
+```{r}
+# Count distinct values of DATE column. 
+length(unique(transaction$DATE))
+
+```
+There are 364 days, which was collected. However, we already knew that Starting date is "2018-07-01" and End date is "2019-06-30". It should have 365 days, So, we need to check the missing date. We will check after cleasing data. 
+
+Next, let check another dataset "customer" 
+```{r Explore Dataset_Custo1}
+glimpse(customer)
+```
+
+There are 3 column with 72,637 Observations. 
+All columns should be converted to factor. 
+
+```{r Explore Dataset_Custo2}
+customer$LYLTY_CARD_NBR <- as.factor(customer$LYLTY_CARD_NBR) 
+
+customer %>% mutate_if(is.character, as.factor)
+```
+
+There are 72,637 rows/observation in this customer dataset, so we need to check that all this rows are unique? or some are duplicated? 
+```{r}
+# To check distinct value of LYLTY_CARD_NBR of customer dataset. 
+
+length(unique(customer$LYLTY_CARD_NBR))
+```
+There are 72,637 unique card number == 72,637 rows. This mean each row represents each customer, There is no duplicate rows. 
+
+We also seen from "LYLTY_CARD_NBR of Transaction data" has 72,637 unique card number. Both dataset are matched both customer information and their transactions
+
+```{r}
+# To check distinct value of LIFESTAGE column
+length(unique(customer$LIFESTAGE)) 
+```
+There are 7 age groups, So let see the frequency of each group. 
+
+```{r}
+# To check each age group and their frequency 
+lifestage_freq <- customer %>% count(LIFESTAGE) %>% arrange(desc(n))
+
+lifestage_freq
+```
+
+```{r}
+# To check distinct value of CUSTOMER Segment column
+length(unique(customer$PREMIUM_CUSTOMER)) 
+```
+There are 3 groups of customer segment, So let see the frequency of each group. 
+
+```{r}
+# # To check each group of customer segment & frequency 
+preCus_freq <- customer %>% count(PREMIUM_CUSTOMER) %>% arrange(desc(n))
+
+preCus_freq
+```
+
+
+### 1.4 Join dataset
+As we seen from 2 dataset, we can join table with 'customer loyalty card number' which appeared on both dataset.  
+
+```{r Join table}
+all <- transaction %>% 
+    left_join(customer, by = "LYLTY_CARD_NBR")
+```
+This two dataset is joined by left_join. Then, we will check NULL from our new dataset.
+
+
+### 1.5 Check Null 
+There are 264,836 observations. So, we will check how many observation complete? 
+```{r}
+# How many observations complete ? - count TRUE
+sum(complete.cases(all))  
+# Comment: 264,836 == 264,836
+
+mean(complete.cases(all)) 
+# Comment: 1, means all observation are completed.
+```
+
+
+### 1.6 Remove Outliers
+Take a look on Outliers by using summary()
+```{r Outlier_1}
+summary(all)
+```
+There are outliers from 'PROD_QTY' and 'TOT_SALES' column which shown Max number out far from 3rd quartile.
+
+```{r Outlier_2}
+all %>% filter(PROD_QTY == 200.000)
+all %>% filter(TOT_SALES == 650.000 )
+```
+
+We found that these outlier are from same transactions(same date & same customers), it is incorrect both PROD_QTY and TOT_SALES.
+
+So, Let's see other transaction that this customer made. 
+
+```{r Outlier_3}
+all %>% filter(LYLTY_CARD_NBR == 226000)
+```
+It looks like this customer has only had the two transactions over the year and is not an ordinary retail customer. The customer might be buying chips for commercial purposes instead. We'll remove this loyalty card number from further analysis.
+
+```{r Outlier_4}
+all <- all %>% filter(LYLTY_CARD_NBR != 226000)
+
+#  264,834 Observations/rows
+
+summary(all)
+```
+
+
+### 1.7 String Manipulation
+According to product name column, we should separate product name and product size. 
+
+```{r Extract Pack_size}
+# To create New column "PACK_SIZE" and Extract only number from PROD_NAME
+
+all["PACK_SIZE"] <- str_extract(all$PROD_NAME, "\\d+")
+
+# To convert the data type from Character to numeric
+all$PACK_SIZE <- as.double(all$PACK_SIZE)
+head(all)
+```
+
+```{r String Manipulate_1}
+# To remove the Punctuation and Pack size from Product name
+all$PROD_NAME <- str_replace_all(all$PROD_NAME, "[[:punct:]]", " ")
+
+all$PROD_NAME <- str_replace_all(all$PROD_NAME, "[0-9]++[gG]", " ")
+```
+
+```{r String Manipulate_2}
+# To trim extra white space
+all$PROD_NAME <- gsub("\\s+"," ", all$PROD_NAME)
+
+# To Convert First letter of every word to Uppercase 
+all$PROD_NAME <- str_to_title(all$PROD_NAME)
+```
+
+
+```{r Extract Brand}
+# To extract the name of brand 
+all$BRAND <- gsub("([A-Za-z]+).*", "\\1", all$PROD_NAME)
+```
+
+
+```{r}
+# Let's count Brand name 
+summary(as_factor(all$BRAND))
+
+# Rename the duplicated brand name
+all$BRAND <- gsub("Red", "Rrd", all$BRAND)
+all$BRAND <- gsub("Doritos", "Dorito", all$BRAND)
+all$BRAND <- gsub("Snbts", "Sunbites", all$BRAND)
+all$BRAND <- gsub("Ncc", "Natural", all$BRAND)
+all$BRAND <- gsub("Smiths", "Smith", all$BRAND)
+all$BRAND <- gsub("Ww", "Woolworths", all$BRAND)
+all$BRAND <- gsub("Infzns","Infuzions", all$BRAND)
+```
+```{r}
+all$BRAND <- gsub("Dorito", "Doritos", all$BRAND)
+
+summary(as_factor(all$BRAND))
+```
+
+
+### 1.8 Drop Irrelevant data
+There are salsa products in the dataset but we are only interested in the chips category. 
+
+```{r Drop Irrelevant data}
+# To drop the rows that contain 'Salsa'
+
+sum(str_detect(all$PROD_NAME, pattern = "Salsa")) 
+# There are 18,094 products containing words "Salsa" 
+
+all <- all %>% filter(grepl("Salsa", all$PROD_NAME)== FALSE)
+
+glimpse(all) 
+# 246,740 Observations (264,834 - 18,094)
+```
+
+
+### 1.9 Examine Date data
+
+```{r}
+# To summary of transaction count by Date
+date_freq <- all %>% count(DATE) %>% arrange(desc(n)) 
+```
+There are 364 days. However, we have 365 days in a year. So, what is missing date? 
+
+```{r}
+# Create the graph to show the peak of sales
+p_date <- ggplot(date_freq, aes(DATE,n)) + 
+    geom_line() + 
+    labs(x = "Day", 
+         y = "Number of Transaction", 
+         title = "Transaction over time") + 
+    scale_x_date(breaks = "1 month") +
+    theme(axis.text.x = element_text(angle = 90,
+                                     vjust = 0.5))
+
+p_date
+```
+
+We clearly see that the increase of purchasing snack in December. So, we will close up look what date are. 
+```{r}
+decem <- date_freq %>% select(DATE,n) %>% 
+    filter(DATE >= as.Date("2018-12-01") & DATE <= as.Date("2018-12-31")) %>%
+    arrange(desc(n))
+
+p_decem <- ggplot(decem,aes(DATE,n)) +
+    geom_col() + 
+    labs(x = "Day", 
+         y = "Number of Transaction", 
+         title = "Transaction in December") + 
+    scale_x_date(date_minor_breaks = "1 day")
+
+p_decem
+```
+
+We can see that the increase in sales occurs in the lead-up to Christmas and that there are zero sales on Christmas day itself. This is due to shops being closed on Christmas day.
+
+### 2.10 Save and Export cleaned data from Rstudio 
+```{r}
+write_csv(all,"QVI_data.csv")
+```
+
+
+## Part 2: Data Exploration
+
+### 2.1 Which brand is the most favorite brand ?
+```{r}
+# Count all brands from Transaction data
+brand_freq <- all %>% count(BRAND) %>% arrange(desc(n))
+
+brand_freq
+```
+There are 21 brands in this transaction data. 
+'Kettle' is the most favorite brand of chips(41,288 transaction). Then, 'Smith' (30353 transaction) and 'Doritos'  (25,224) 
+
+The least popular brand is 'French' 1,418 transaction 
+
+### 2.2 Which brand made the high profit ?
+```{r}
+# To sum Total Sales by Brand
+top_sale_brand <- all %>% 
+  select(BRAND, TOT_SALES) %>%
+  group_by(BRAND) %>%
+  summarize(total = sum(TOT_SALES)) %>%
+  arrange(desc(total))
+
+top_sale_brand
+```
+And, again 'Kettle' is still be the first brand which highest profit compared with others. ($390,239.8) 
+
+However, the second and third rank are swap the places from above. 'Doritos' ($ 226329.9) now comes to second place which made higher profit than 'Smith' (217,492)
+
+The lowest profit is 'Burger' brand, it just $ 6,831 
+
+### 2.3 How many customers in each age group? 
+```{r}
+# To check age group
+lifestage_freq <- customer %>% count(LIFESTAGE) %>% arrange(desc(n))
+
+lifestage_freq
+```
+
+Table shows that "RETIRE" is the large group of customers who held the Loyalty Card (14,805). OLDER and YOUNG SINGLES/COUPLES are comes to the second and the third group (14,609 and 14,441 respectively). 
+
+```{r}
+lifestage_freq %>% ggplot(aes(LIFESTAGE,n)) +
+  geom_col() + 
+  theme(axis.text.x = element_text(angle = 45,
+                                  vjust = 0.5,
+                                   size = 6))
+```
+The lowest amount of customer group which held the Loyalty Card is NEW FAMILIES(2,549).
+
+### 2.4 How many customers in each purchasing group? 
+```{r}
+# To count number of people by PREMIUM_CUSTOMER
+preCus_freq <- customer %>% count(PREMIUM_CUSTOMER) %>% arrange(desc(n))
+
+preCus_freq
+```
+'Mainstream' is the highest group of customer (29,245). The following are 'Budget'(24,470) and 'Premium' (18,922). 
+
+```{r}
+preCus_freq %>% ggplot(aes(PREMIUM_CUSTOMER, n)) +
+  geom_col()
+```
+
+## Part 3: Data Analysis on Customer Segments 
+
+Now, we can define some metrics of interest to 
+the client:
+
+- How many customers are in each segment
+- Who spends the most on chips (total sales), describing customers by life stage and
+how premium their general purchasing behaviour is
+- How many chips are bought per customer by segment
+- What's the average chip price by customer segment
+
+### 3.1 How many customers are in each segment? 
+```{r message=FALSE, warning=FALSE}
+# Customer by Life Stage and Premium rank 
+
+all %>% group_by(PREMIUM_CUSTOMER, LIFESTAGE) %>%
+  summarize(count = n_distinct(LYLTY_CARD_NBR)) %>% 
+  arrange(desc(count))
+```
+If we combine the Life Stage with Purchasing behavior(Premium_customer), we could see the result that 'Mainstream Class of YOUNG SINGLES/COUPLES' is the main group of customer in our company, who held the Loyalty card. They has a highest proportion (7,917 peoples) 
+
+'Retired with Mainstream class' comes to the second place (6,358) and the third place is 'OLDER SINGLES/COUPLES with mainstream class' which far behind the second place. (4,858 peoples)
+
+However, Our number of customers in each group does not guarantee the profit and total sales that company received. So, we need to explore the total sales of each group again below. 
+
+### 3.2 Who spends the most on chips (total sales), describing customers by life stage and how premium their general purchasing behavior is
+```{r message=FALSE, warning=FALSE}
+all %>% group_by(PREMIUM_CUSTOMER, LIFESTAGE) %>%
+  summarize(total_sale = sum(TOT_SALES),) %>% 
+  arrange(desc(total_sale))
+```
+From the table, We found that 'Older families of Budget segment' has the highest sales of purchasing Chips. ($ 156,863.75) 
+
+It is striking that the second and the third place swap the place.'YOUNG SINGLES/COUPLES with mainstream class' now is second place with total sales is 147,582. But 'Retired with Mainstream class' goes down to the third place (145,168.95)
+
+### 3.3 How many chips are bought per customer by segment
+```{r message=FALSE, warning=FALSE}
+all %>% group_by(PREMIUM_CUSTOMER, LIFESTAGE) %>% 
+  summarize( totalChip = sum(PROD_QTY), 
+              aveUnitPerCustomer = mean(PROD_QTY)) %>%
+  arrange(desc(aveUnitPerCustomer))
+```
+Older families and young families in general buy more chips per customer.
+
+### 3.4 What's the average chip price by customer segment
+
+```{r message=FALSE, warning=FALSE}
+
+Customer_Seg <- all %>% 
+          group_by(PREMIUM_CUSTOMER, LIFESTAGE) %>% 
+          summarize(aveUnitPerCustomer = 
+                    sum(TOT_SALES)/sum(PROD_QTY)) %>%
+          arrange(desc(aveUnitPerCustomer))
+
+Customer_Seg
+```
+Mainstream mid-age and young singles and couples are more willing to pay more per packet of chips compared to their budget and premium counterparts. This may be due to premium shoppers being more likely to buy healthy snacks and when they buy chips, this is mainly for entertainment purposes rather than their own consumption. This is also supported by there being fewer premium mid-age and young singles and couples buying chips compared to their mainstream counterparts.
+
+
+```{r message=FALSE, warning=FALSE}
+# To compare each segment by average chip prices 
+Customer_Seg %>%
+ggplot(aes(LIFESTAGE, aveUnitPerCustomer, 
+                 fill = PREMIUM_CUSTOMER)) +   
+  geom_col(position = "dodge", alpha = 0.8) + 
+  theme_minimal(base_size = 8) +
+  theme(axis.text.x = element_text(angle = 90)) +    
+  scale_fill_viridis(discrete = TRUE, direction = -1)
+```
+There are some interesting on the graph above, Mainstream class of Mid-age and Young Single/Couples group - look higher than other groups. 
+
+As the difference in average price per unit isn't large, we can check if this difference is statistically different. 
+
+### 3.5 Perform an independent t-test between "mainstream vs premium/ budget" of Young & Mid-Age singles/couples
+
+```{r}
+# To create new column of Average sales per Unit
+all <- all %>% mutate(aveUnitPerCustomer = TOT_SALES/PROD_QTY) 
+```
+
+
+```{r}
+# Separate between 2 groups of Mainstream and Non Mainstream 
+mainStream <- all %>% 
+  filter(LIFESTAGE == c("YOUNG SINGLES/COUPLES", 
+                        "MIDAGE SINGLES/COUPLES") &
+           PREMIUM_CUSTOMER == "Mainstream") 
+
+nonMainStream <- all %>% 
+  filter(LIFESTAGE == c("YOUNG SINGLES/COUPLES", 
+                        "MIDAGE SINGLES/COUPLES") &
+           PREMIUM_CUSTOMER != "Mainstream") 
+```
+
+
+```{r}
+ggplot() + 
+          geom_histogram(data = mainStream, 
+                         mapping = aes(aveUnitPerCustomer),
+                         bins = 10, fill ="navy", 
+                         alpha = 0.5) + 
+          geom_histogram(data = nonMainStream, 
+                         mapping = aes(aveUnitPerCustomer),
+                         bins = 10, fill="gold", 
+                         alpha = 0.5) + 
+  theme_minimal() 
+```
+
+```{r}
+t.test(mainStream$aveUnitPerCustomer, 
+       nonMainStream$aveUnitPerCustomer)
+```
+The t-test results in a p-value of 2.2 the unit price for mainstream, Young and Mid-age singles and couples ARE significantly higher than that of budget or premium, Young and Mid-age singles and couples.
+
+### 3.6 Deep dive into Mainstream, young singles/couples. Do they tend to buy a particular of Chips? 
+```{r}
+# Let's find which brand they bought, Do they tend to buy a particular of Chips? 
+
+mainStream_Young <- all %>% 
+  filter(LIFESTAGE == "YOUNG SINGLES/COUPLES" 
+         & PREMIUM_CUSTOMER == "Mainstream") %>% 
+  group_by(BRAND) %>%
+  summarize(total_sales = sum(TOT_SALES)) %>% 
+  arrange(desc(total_sales)) %>% 
+  head()
+
+ggplot(mainStream_Young, aes(BRAND, total_sales)) + 
+  geom_col() 
+```
+Kettle and Doritos is the top 2 of purchasing for Mainstream, young singles/couples Group. 
+
+### 3.7 Most Favourite Brand with Pack Size 
+```{r message=FALSE, warning=FALSE}
+all %>% filter(LIFESTAGE == "YOUNG SINGLES/COUPLES" &
+                 PREMIUM_CUSTOMER == "Mainstream") %>% 
+  group_by(BRAND,as.factor(PACK_SIZE)) %>%
+  summarize(total_sales = sum(TOT_SALES)) %>% 
+  arrange(desc(total_sales))
+```
+The Young Single/Married of Mainstream rank tend to buy "Kettle with 175 g." with the highest total profit at 8.818.20, which is almost double number than "Doritos brand with 170g" with total sale at 4,936.80 
+
+Both brands of pack size are not much different, but shows a big gap of total sales. 
+
+
+### 3.8 Brand Affinity 
+```{r}
+# Comparing between the group of Young/Mainstream and others. Spilt into two groups. 
+young_main <- all %>% filter(
+              LIFESTAGE == "YOUNG SINGLES/COUPLES" &
+              PREMIUM_CUSTOMER == "Mainstream") 
+             
+other_group <- all %>% filter(
+              LIFESTAGE != "YOUNG SINGLES/COUPLES" &
+              PREMIUM_CUSTOMER != "Mainstream") 
+```
+
+```{r}
+# Sum the purchasing quantity in each group. 
+quantity_youngMain <- young_main %>% 
+                      summarize(sum(PROD_QTY))
+
+quantity_other <- other_group %>% 
+                      summarize(sum(PROD_QTY))
+```
+
+```{r}
+# Brand Affinity compared to the rest of the population
+
+young_main_byBrand <- young_main %>% 
+  group_by(BRAND) %>% 
+  summarize(target = sum(PROD_QTY)/quantity_youngMain)
+
+other_group_byBrand <- other_group %>% 
+  group_by(BRAND) %>% 
+  summarize(other = sum(PROD_QTY)/quantity_other)
+```
+
+```{r}
+# Which brand had high Affinity to Brand? 
+
+brand_proportions <- inner_join(young_main_byBrand, other_group_byBrand, by = "BRAND") %>% 
+  mutate(affinityToBrand = target/other ) %>%
+  arrange(desc(affinityToBrand))
+
+brand_proportions
+```
+
+Mainstream young singles/couples are more likely to purchase "Tyrrells" chips compared to the
+rest of the population
+
+Mainstream young singles/couples are less likely to purchase "Burger" compared to the rest
+of the population
+
+### 3.9 Preferred Pack Size 
+Let’s also find out if our target segment tends to buy larger packs of chips.
+
+```{r}
+# Preferred pack size compared to the rest of the population
+
+young_main_byPack <- young_main %>% group_by(PACK_SIZE) %>% 
+  summarize(target = sum(PROD_QTY)/quantity_youngMain)
+
+other_group_byPack<- other_group %>% group_by(PACK_SIZE) %>% 
+  summarize(other = sum(PROD_QTY)/quantity_other)
+```
+
+```{r echo=TRUE}
+# Which Pack Size is the most favorite for Young/Mainstream group?  
+
+pack_proportions <- inner_join(young_main_byPack, other_group_byPack, by = "PACK_SIZE") %>%
+  mutate(affinityToPack = target/other ) %>%
+  arrange(desc(affinityToPack))
+```
+
+It looks like Mainstream young singles/couples are more likely to purchase a 270g pack of chips compared to the rest of the population but let’s dive into what brands sell this pack size.
+
+```{r}
+all %>% select(PROD_NAME, PACK_SIZE) %>% 
+        filter(PACK_SIZE == 270) %>% count(PROD_NAME)
+```
+"Twisties" are the only brand offering 270g packs and so this may instead be reflecting a higher likelihood of
+purchasing Twisties.
+
+## Conclusion 
+
+The groups that spends the most on chips (total sales) are from 
+- Budget	OLDER FAMILIES	
+- Mainstream	YOUNG SINGLES/COUPLES	
+- Mainstream	RETIREES
+
+However, we found that the group of "YOUNG SINGLES/COUPLES"	and "OLDER FAMILIES" have higher rate of purchasing Chips per customers than others group.  
+
+"Kettle" is the most favorite brand with high total sales.  
+
+Mainstream mid-age and young singles and couples are more willing to pay more per packet of chips compared to their budget and premium.
+
+After deep drive into only target group (Mainstream Young single/couple group), "Tyrrells" brand is the most favorite brand compared to the rest of population. And target group preferred to buy pack_size 270g. of Twisties brand. 
+
