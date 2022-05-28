@@ -1,6 +1,6 @@
 # Quantium_Forage
 
-The Forage is the platform of Internship through Online. There are various projects from the companies. Quantium is the company which provide the Retail dataset on the stores in Australia. 
+The Forage is the platform of Internship through Online. There are various projects from the companies. Quantium is the company which provide the Data Analytics Vitual Internship Program. This task is about the Chips Brand Products selling through the Retail store in Australia, which giving us 2 datasets: transaction data from each brand product and customer detail. 
 
 ## Dataset 
   - QVI_purchase_behavior.csv
